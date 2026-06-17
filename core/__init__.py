@@ -8,6 +8,7 @@ from .inverse_design import TargetOptimizer
 from .cohort_sim import VirtualCohort
 from .spatial import SpatialTissueEnvironment
 from .bio_agent import DossierGenerator
+from .structural import AlphaFoldBridge
 
 __all__ = [
     'MultiOmicTensor',
@@ -18,5 +19,6 @@ __all__ = [
     'TargetOptimizer',
     'VirtualCohort',
     'SpatialTissueEnvironment',
-    'DossierGenerator'
+    'DossierGenerator',
+    'AlphaFoldBridge'
 ]

@@ -2,6 +2,7 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+import plotly.express as px
 import torch
 import sys
 import os
@@ -19,7 +20,12 @@ from core.inverse_design import TargetOptimizer
 from core.cohort_sim import VirtualCohort
 from core.spatial import SpatialTissueEnvironment
 from core.bio_agent import DossierGenerator
+from core.structural import AlphaFoldBridge
+from core.quantum_rbm import QuantumInspiredRBM
+from core.systemic import SystemicOrganNetwork
 from streamlit_react_flow import react_flow
+import py3Dmol
+from stmol import showmol
 
 # --- NATIVE PCA FOR 2D PROJECTION ---
 def native_pca(X: torch.Tensor, n_components: int = 2) -> torch.Tensor:
@@ -32,7 +38,7 @@ def native_pca(X: torch.Tensor, n_components: int = 2) -> torch.Tensor:
 
 # --- SETUP MOCK DATA ---
 @st.cache_resource
-def setup_mosaic_engine():
+def setup_mosaic_engine(cache_buster=1):
     np.random.seed(42)
     torch.manual_seed(42)
     
@@ -56,7 +62,12 @@ def setup_mosaic_engine():
     num_visible = v_data.shape[1]
     num_hidden = 15
     rbm = MultiOmicRBM(num_visible, num_hidden)
-    rbm.fit(v_data, epochs=5, batch_size=64, k=1, lr=0.05)
+    rbm.fit(v_data, epochs=5, batch_size=64, k=1, lr=0.005)
+    
+    q_rbm = QuantumInspiredRBM(num_visible, num_hidden, rank=4)
+    q_rbm.copy_from_dense(rbm)
+    
+    sys_net = SystemicOrganNetwork(num_visible)
     
     fg = FactorGraphBP(num_tfs=10, num_enhancers=20, num_genes=30)
     fg.run_loopy_bp(max_iters=5)
@@ -67,48 +78,120 @@ def setup_mosaic_engine():
     
     avoidance_states = [torch.rand(num_visible), torch.rand(num_visible)]
     
-    return v_data, rbm, fg, perturb_sim, dyn_sim, adj_tf_enh, adj_enh_gene, avoidance_states, spatial_env, coords
+    return v_data, rbm, q_rbm, sys_net, fg, perturb_sim, dyn_sim, adj_tf_enh, adj_enh_gene, avoidance_states, spatial_env, coords
 
 # --- UI CONFIGURATION ---
-st.set_page_config(page_title="MOSAIC Spatial Physics", layout="wide", page_icon="🧬")
+st.set_page_config(page_title="MOSAIC Spatial Physics", layout="wide", page_icon="🔬")
 
 st.markdown("""
-    <style>
-    .stApp { background-color: #121212; color: #e0e0e0; }
-    h1, h2, h3 { color: #00ffcc; font-family: 'Courier New', Courier, monospace; }
-    .stSidebar { background-color: #1e1e1e; border-right: 1px solid #00ffcc; }
-    .stButton>button { background-color: #00ffcc; color: #121212; font-weight: bold; border: None; }
-    .stButton>button:hover { background-color: #00e6b8; }
-    .metric-card { background-color: #1e1e1e; border: 1px solid #00ffcc; border-radius: 10px; padding: 15px; margin-bottom: 20px;}
-    .stTabs [data-baseweb="tab-list"] { gap: 24px; }
-    .stTabs [data-baseweb="tab"] { color: #e0e0e0; }
-    </style>
+<style>
+    /* Absolute Base Reset */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    
+    html, body, [data-testid="stAppViewContainer"] {
+        background-color: #030712 !important;
+        font-family: 'Inter', sans-serif !important;
+        color: #F3F4F6 !important;
+    }
+    
+    /* Header & Branding Elimination */
+    [data-testid="stHeader"], footer, #MainMenu {
+        visibility: hidden !important;
+        height: 0px !important;
+    }
+    
+    /* Sleek Sidebar Architecture */
+    [data-testid="stSidebar"] {
+        background-color: #0B0F19 !important;
+        border-right: 1px solid #1F2937 !important;
+    }
+    
+    /* Premium Glassmorphic Cards */
+    div.stMetric, .stExpander {
+        background: rgba(17, 24, 39, 0.7) !important;
+        border: 1px solid rgba(255, 255, 255, 0.05) !important;
+        border-radius: 12px !important;
+        padding: 1.25rem !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+    }
+    
+    /* Input Field Normalization */
+    .stTextInput input, .stSelectbox select, .stTextArea textarea {
+        background-color: #111827 !important;
+        border: 1px solid #374151 !important;
+        color: #F3F4F6 !important;
+        border-radius: 8px !important;
+        transition: all 0.2s ease-in-out !important;
+    }
+    
+    .stTextInput input:focus, .stSelectbox select:focus {
+        border-color: #00F0FF !important;
+        box-shadow: 0 0 0 1px #00F0FF !important;
+    }
+    
+    /* High-Contrast Action Buttons */
+    .stButton > button {
+        background: linear-gradient(135deg, #00F0FF 0%, #0072FF 100%) !important;
+        color: #030712 !important;
+        font-weight: 600 !important;
+        border: none !important;
+        border-radius: 8px !important;
+        padding: 0.5rem 1.5rem !important;
+        transition: transform 0.1s ease !important;
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-1px) !important;
+        box-shadow: 0 0 15px rgba(0, 240, 255, 0.4) !important;
+    }
+    
+    /* Clean Minimalist Tabs */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px !important;
+        background-color: transparent !important;
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        background-color: #111827 !important;
+        border: 1px solid #1F2937 !important;
+        border-radius: 6px 6px 0 0 !important;
+        padding: 6px 16px !important;
+        color: #9CA3AF !important;
+    }
+
+    .stTabs [aria-selected="true"] {
+        background-color: #1F2937 !important;
+        color: #00F0FF !important;
+        border-bottom: 2px solid #00F0FF !important;
+    }
+</style>
 """, unsafe_allow_html=True)
 
-st.title("🧬 MOSAIC: Spatial Regulatory Dynamics")
+st.title("MOSAIC: Spatial Regulatory Dynamics")
 
 # Load Engine
-v_data, rbm, fg, perturb_sim, dyn_sim, adj_tf_enh, adj_enh_gene, avoidance_states, spatial_env, coords = setup_mosaic_engine()
+v_data, rbm, q_rbm, sys_net, fg, perturb_sim, dyn_sim, adj_tf_enh, adj_enh_gene, avoidance_states, spatial_env, coords = setup_mosaic_engine()
 
 # --- SIDEBAR CONTROLS ---
 st.sidebar.header("🎛️ Tissue Controls")
 selected_cell = st.sidebar.slider("Select Origin Cell (Tissue Index)", 0, v_data.shape[0]-1, 250)
 selected_vector = v_data[selected_cell]
 
-cpei = rbm.calculate_plasticity_entropy(selected_vector.unsqueeze(0)).item()
-st.sidebar.markdown(f"""
-<div class="metric-card">
-    <h4>CPEI (Plasticity Gauge)</h4>
-    <h2 style="margin: 0;">{cpei:.3f} bits</h2>
-</div>
-""", unsafe_allow_html=True)
+is_quantum = st.sidebar.toggle("Quantum Tensor Acceleration (MPS)", value=False)
+active_rbm = q_rbm if is_quantum else rbm
+
+cpei = active_rbm.calculate_plasticity_entropy(selected_vector.unsqueeze(0)).item()
+st.sidebar.metric("CPEI (Plasticity Gauge)", f"{cpei:.3f} bits")
 
 target_tf = st.sidebar.selectbox("Paracrine Perturbation TF", range(10))
 
 # Pre-calculate data
 with torch.no_grad():
     coords_2d = native_pca(v_data, n_components=2)
-    energies = rbm.calculate_free_energy(v_data, spatial_env=spatial_env)
+    if is_quantum:
+        energies = active_rbm.calculate_quantum_free_energy(v_data)
+    else:
+        energies = active_rbm.calculate_free_energy(v_data, spatial_env=spatial_env)
 
 df = pd.DataFrame({
     'UMAP_1': coords_2d[:, 0].numpy(),
@@ -162,7 +245,7 @@ with tab1:
         else:
             color_data = df['Free_Energy']
             title_text = "Baseline Tissue Free Energy"
-            colorscale = 'Viridis'
+            colorscale = 'Blues'
 
         fig_spatial = go.Figure(data=[go.Scatter(
             x=df['Spatial_X'], y=df['Spatial_Y'],
@@ -181,14 +264,21 @@ with tab1:
         # Highlight Selected
         fig_spatial.add_trace(go.Scatter(
             x=[df.iloc[selected_cell]['Spatial_X']], y=[df.iloc[selected_cell]['Spatial_Y']],
-            mode='markers', marker=dict(size=18, color='yellow', symbol='star', line=dict(width=2, color='red')),
+            mode='markers', marker=dict(size=14, color='#ffffff', symbol='circle', line=dict(width=2, color='#333333')),
             name='Perturbed Origin'
         ))
         
         fig_spatial.update_layout(
             title=title_text,
             xaxis_title='Spatial X (μm)', yaxis_title='Spatial Y (μm)',
-            paper_bgcolor='#121212', plot_bgcolor='#121212', font_color='#e0e0e0', height=600
+            template="plotly_dark",
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font=dict(family="Inter, sans-serif", color="#9CA3AF"),
+            margin=dict(l=20, r=20, t=40, b=20),
+            xaxis=dict(gridcolor="#1F2937", zerolinecolor="#374151", linecolor="#374151"),
+            yaxis=dict(gridcolor="#1F2937", zerolinecolor="#374151", linecolor="#374151"),
+            height=600
         )
         st.plotly_chart(fig_spatial, use_container_width=True)
 
@@ -202,20 +292,26 @@ with tab2:
     from scipy.interpolate import griddata
     Z_grid = griddata((df['UMAP_1'], df['UMAP_2']), df['Free_Energy'], (X_grid, Y_grid), method='cubic', fill_value=df['Free_Energy'].max())
 
-    fig_ls = go.Figure(data=[go.Surface(z=Z_grid, x=x_grid, y=y_grid, colorscale='Viridis', opacity=0.8, showscale=False)])
+    fig_ls = go.Figure(data=[go.Surface(z=Z_grid, x=x_grid, y=y_grid, colorscale='Blues', opacity=0.8, showscale=False)])
     
     fig_ls.add_trace(go.Scatter3d(
         x=df['UMAP_1'], y=df['UMAP_2'], z=df['Free_Energy'],
-        mode='markers', marker=dict(size=3, color='#00ffcc', opacity=0.6), name='Cell Basins'
+        mode='markers', marker=dict(size=3, color='#4da6ff', opacity=0.8), name='Cell Basins'
     ))
 
     fig_ls.update_layout(
+        template="plotly_dark",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(family="Inter, sans-serif", color="#9CA3AF"),
+        margin=dict(l=0, r=0, t=0, b=0),
         scene=dict(
             xaxis_title='PCA_1', yaxis_title='PCA_2', zaxis_title='Free Energy (F)',
-            bgcolor='#121212', xaxis=dict(showbackground=False, gridcolor='#333'),
-            yaxis=dict(showbackground=False, gridcolor='#333'), zaxis=dict(showbackground=False, gridcolor='#333')
+            xaxis=dict(backgroundcolor="rgba(0,0,0,0)", gridcolor="#1F2937", showbackground=False),
+            yaxis=dict(backgroundcolor="rgba(0,0,0,0)", gridcolor="#1F2937", showbackground=False),
+            zaxis=dict(backgroundcolor="rgba(0,0,0,0)", gridcolor="#1F2937", showbackground=False)
         ),
-        paper_bgcolor='#121212', plot_bgcolor='#121212', margin=dict(l=0, r=0, b=0, t=0), height=600
+        height=600
     )
     st.plotly_chart(fig_ls, use_container_width=True)
 
@@ -247,28 +343,24 @@ with tab3:
             st.table(pd.DataFrame(target_df))
             
     if 'optimal_targets' in st.session_state:
-        st.markdown("---")
-        st.subheader("Autonomous Dossier Generation")
+        st.subheader("Autonomous Clinical Actions")
         
-        api_key = st.text_input("OpenRouter API Key", type="password", help="Enter your OpenRouter API key to power the Bio-LLM orchestration.")
+        action_col1, action_col2 = st.columns(2)
         
-        if st.button("Generate Pre-Clinical FDA Dossier", use_container_width=True):
-            if not api_key:
-                st.error("Please provide an API Key.")
-            else:
-                with st.spinner("Orchestrating AI Pharmacologist..."):
-                    # Gather metrics
-                    tfs = [t[0] for t in st.session_state['optimal_targets']]
-                    dosages = [t[1] for t in st.session_state['optimal_targets']]
-                    safe_score = st.session_state.get('safety_score', 85.0)
-                    
-                    # Pull efficacy and spatial from state if run, otherwise mock for the LLM context
-                    eff_rate = st.session_state.get('efficacy_rate', "87.5%")
-                    spatial_var = "Simulated Paracrine $\Delta$E = -14.2" if 'spatial_delta_e' in st.session_state else "Pending Tissue Map Evaluation"
-                    
-                    agent = DossierGenerator(api_key=api_key)
-                    
+        with action_col1:
+            if st.button("Generate Pre-Clinical FDA Dossier", use_container_width=True):
+                with st.spinner("Orchestrating AI Pharmacologist via OpenRouter..."):
                     try:
+                        # Gather metrics
+                        tfs = [t[0] for t in st.session_state['optimal_targets']]
+                        dosages = [t[1] for t in st.session_state['optimal_targets']]
+                        safe_score = st.session_state.get('safety_score', 85.0)
+                        
+                        # Pull efficacy and spatial from state if run, otherwise mock for the LLM context
+                        eff_rate = st.session_state.get('efficacy_rate', "87.5%")
+                        spatial_var = "Simulated Paracrine $\Delta$E = -14.2" if 'spatial_delta_e' in st.session_state else "Pending Tissue Map Evaluation"
+                        
+                        agent = DossierGenerator()
                         stream = agent.generate_clinical_dossier(
                             target_tfs=tfs,
                             dosages=dosages,
@@ -290,3 +382,62 @@ with tab3:
                         
                     except Exception as e:
                         st.error(f"LLM Routing Error: {e}")
+
+        with action_col2:
+            if st.button("Verify 3D Protein Structure", use_container_width=True):
+                with st.spinner("Fetching AlphaFold DB Conformation..."):
+                    try:
+                        # Map TF index to a realistic gene from our bridge
+                        top_tf_idx = st.session_state['optimal_targets'][0][0]
+                        mock_genes = ['MYC', 'SOX2', 'POU5F1', 'KLF4', 'TP53', 'STAT3', 'GATA3', 'FOXA1', 'ESR1', 'HNF4A']
+                        target_gene = mock_genes[top_tf_idx % len(mock_genes)]
+                        
+                        bridge = AlphaFoldBridge()
+                        pdb_string = bridge.fetch_protein_structure(target_gene)
+                        
+                        st.success(f"Structural Validation: **{target_gene}**")
+                        
+                        # Render py3Dmol with Deep Charcoal theme
+                        view = py3Dmol.view(width=400, height=400)
+                        view.addModel(pdb_string, 'pdb')
+                        view.setStyle({'cartoon': {'color': 'spectrum'}})
+                        view.setBackgroundColor('#030712')
+                        view.zoomTo()
+                        
+                        # stmol helper function
+                        showmol(view, height=400, width=400)
+                        
+                    except Exception as e:
+                        st.error(f"Structural Verification Error: {e}")
+
+        # --- SYSTEMIC TOXICITY RADAR CHART ---
+        st.markdown("---")
+        st.subheader("Systemic Toxicity Risk Analysis")
+        st.write("Pleiotropic off-target effects simulated via Multi-Organ Thermodynamic Network.")
+        
+        # Recreate optimal vector to test systemic effects
+        opt_vec = torch.zeros(v_data.shape[1])
+        for idx, d in st.session_state['optimal_targets']:
+            opt_vec[idx] = d
+            
+        sys_risks = sys_net.calculate_systemic_toxicity(active_rbm, opt_vec, is_quantum)
+        
+        df_radar = pd.DataFrame(dict(
+            Risk=list(sys_risks.values()),
+            Organ=list(sys_risks.keys())
+        ))
+        
+        fig_radar = px.line_polar(df_radar, r='Risk', theta='Organ', line_close=True)
+        fig_radar.update_traces(fill='toself', line_color='#00F0FF', fillcolor='rgba(0, 240, 255, 0.3)')
+        fig_radar.update_layout(
+            template="plotly_dark",
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            polar=dict(
+                radialaxis=dict(visible=True, range=[0, 100], gridcolor='#1F2937', color='#9CA3AF'),
+                angularaxis=dict(gridcolor='#1F2937', color='#E5E7EB')
+            ),
+            font=dict(family="Inter, sans-serif", color="#9CA3AF"),
+            margin=dict(l=40, r=40, t=40, b=40)
+        )
+        st.plotly_chart(fig_radar, use_container_width=True)

@@ -1,4 +1,4 @@
-numpy
+numpy<2.0.0
 torch
 scipy
 pandas
@@ -6,3 +6,8 @@ streamlit
 plotly
 streamlit-react-flow
 openai
+requests
+stmol
+py3Dmol
+ipython_genutils
+opt_einsum

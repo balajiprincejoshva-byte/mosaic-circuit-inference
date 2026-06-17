@@ -91,18 +91,22 @@ class MultiOmicRBM(nn.Module):
         
         return -(v_term + h_term)
 
-    def calculate_plasticity_entropy(self, v: torch.Tensor, epsilon: float = 1e-9) -> torch.Tensor:
+    def calculate_plasticity_entropy(self, v: torch.Tensor, epsilon: float = 1e-9, temperature: float = 100.0) -> torch.Tensor:
         """
         Quantifies cellular plasticity (stemness vs. differentiation) using thermodynamic entropy.
         S = - sum p(h|v) * log(p(h|v))
         Returns scalar S (High S = multipotent/plastic state, Low S = locked/differentiated state).
         """
-        # Activation probabilities of the hidden layer p(h|v) = sigmoid(c + vW)
+        # Activation probabilities of the hidden layer p(h|v) = sigmoid((c + vW) / T)
         hidden_activation = torch.nn.functional.linear(v, self.W.t(), self.h_bias)
-        p_h_given_v = torch.sigmoid(hidden_activation)
+        p_h_given_v = torch.sigmoid(hidden_activation / temperature)
         
-        # Shannon entropy calculation
-        entropy = -torch.sum(p_h_given_v * torch.log(p_h_given_v + epsilon), dim=1)
+        # Shannon entropy calculation for binary variables
+        entropy = -torch.sum(
+            p_h_given_v * torch.log(p_h_given_v + epsilon) + 
+            (1.0 - p_h_given_v) * torch.log(1.0 - p_h_given_v + epsilon), 
+            dim=1
+        )
         
         return entropy
 
