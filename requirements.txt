@@ -77,8 +77,7 @@ notebook==7.5.7
 notebook_shim==0.2.4
 numpy==1.26.4
 openai==2.42.0
-opentrons==7.2.2
-opentrons_shared_data==7.2.2
+opentrons==9.0.0
 opt_einsum==3.4.0
 overrides==7.7.0
 packaging==25.0
