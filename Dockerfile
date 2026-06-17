@@ -10,6 +10,9 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends build-essential curl && \
     rm -rf /var/lib/apt/lists/*
 
+# Create a non-root user (Required for Hugging Face Spaces)
+RUN useradd -m -u 1000 user
+
 # Set working directory
 WORKDIR /app
 
@@ -24,8 +27,11 @@ RUN grep -v "torch" requirements.txt > requirements_no_torch.txt && \
     pip install --no-cache-dir -r requirements_no_torch.txt && \
     rm requirements_no_torch.txt
 
-# Copy the rest of the application
-COPY . .
+# Copy the rest of the application and set ownership
+COPY --chown=user:user . .
+
+# Switch to the non-root user
+USER user
 
 # Expose the default Streamlit and Hugging Face Spaces port
 EXPOSE 7860

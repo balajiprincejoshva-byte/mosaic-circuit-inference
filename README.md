@@ -1,3 +1,13 @@
+---
+title: MOSAIC
+emoji: 🧬
+colorFrom: blue
+colorTo: purple
+sdk: docker
+pinned: false
+app_port: 7860
+---
+
 <div align="center">
   <h1>🧬 MOSAIC</h1>
   <h3>Multi-Omic Single-cell Attractor Circuit Inference</h3>
