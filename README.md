@@ -60,6 +60,18 @@ MOSAIC was built from the ground up to be ultra-fast and strictly mathematical.
 *   `NumPy` & `SciPy` (Loopy Belief Propagation Matrix Operations)
 *   `Streamlit` & `Plotly` (Enterprise Telemetry & 3D Visualization)
 
+### Deterministic Production Versions
+To guarantee zero pip backtracking and a 100% reproducible build environment (especially for Docker/Hugging Face deployments), the following core packages are strictly pinned:
+*   **torch==2.5.1**
+*   **numpy==1.26.4**
+*   **scipy==1.15.3**
+*   **pandas==2.3.3**
+*   **streamlit==1.58.0**
+*   **plotly==6.8.0**
+*   **opentrons==9.0.0**
+*   **async-lru==2.3.0**
+*   **argon2-cffi==25.1.0**
+*(See `requirements.txt` for the full locked dependency graph)*
 ---
 
 ## 🚀 Quick Start
