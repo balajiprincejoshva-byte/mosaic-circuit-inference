@@ -7,14 +7,26 @@ class SystemicOrganNetwork:
     """
     def __init__(self, num_features: int):
         self.num_features = num_features
-        # Mock tissue profiles representing distinct homeostatic attractors
-        # We use random normal distributions centered at different means
-        self.organ_profiles = {
-            "Target_Tissue": torch.randn(num_features) * 1.5 + 0.5,
-            "Cardiac_Tissue": torch.randn(num_features) * 2.0 + 1.0,
-            "Neural_Tissue": torch.randn(num_features) * 1.5 - 0.5,
-            "Hepatic_Tissue": torch.randn(num_features) * 3.0 + 2.0
+        self.organ_profiles = self.load_baseline_organ_signatures(num_features)
+        
+    def load_baseline_organ_signatures(self, dim: int) -> dict:
+        """
+        Loads baseline organ signatures for systemic pleiotropy evaluation.
+        In production, this could parse a CSV or .pt file.
+        As a deterministic fallback, generates distinct biological attractors using linspace and sinusoids.
+        """
+        # Deterministic generation fallback
+        base = torch.linspace(-1.0, 1.0, dim)
+        
+        # We perturb the linear space with distinct sinusoidal frequencies 
+        # to create unique, stable "attractor" representations for each tissue
+        profiles = {
+            "Target_Tissue": base + torch.sin(base * 3.14) * 0.5 + 0.5,
+            "Cardiac_Tissue": base + torch.cos(base * 6.28) * 1.0 + 1.0,
+            "Neural_Tissue": base + torch.sin(base * 1.57) * 0.8 - 0.5,
+            "Hepatic_Tissue": base + torch.cos(base * 12.56) * 1.2 + 2.0
         }
+        return profiles
         
     def calculate_systemic_toxicity(self, rbm, perturbation_vector: torch.Tensor, is_quantum=False):
         """

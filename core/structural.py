@@ -6,29 +6,28 @@ class AlphaFoldBridge:
     optimized transcription factors from the AlphaFold DB.
     """
     
-    # Standard mapping for key TFs (UniProt IDs)
-    UNIPROT_MAP = {
-        'MYC': 'P01106',
-        'SOX2': 'P48431',
-        'POU5F1': 'Q01860',
-        'KLF4': 'O43474',
-        'TP53': 'P04637',
-        'STAT3': 'P40763',
-        'GATA3': 'P23771',
-        'FOXA1': 'P55317',
-        'ESR1': 'P03372',
-        'HNF4A': 'P41235'
-    }
+    def resolve_uniprot_id(self, gene_name: str) -> str:
+        """
+        Dynamically queries the public UniProt REST API to resolve a human gene symbol
+        to its primary UniProt accession ID.
+        """
+        url = f"https://rest.uniprot.org/uniprotkb/search?query=gene_exact:{gene_name}+AND+organism_id:9606"
+        response = requests.get(url, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get('results') and len(data['results']) > 0:
+                # Return the primary accession of the top hit
+                return data['results'][0]['primaryAccession']
+                
+        raise ValueError(f"Gene '{gene_name}' could not be resolved to a UniProt ID via REST API.")
 
     def fetch_protein_structure(self, gene_name: str) -> str:
         """
         Fetches the .pdb string from AlphaFold DB for a given gene.
         """
         gene_name = gene_name.upper()
-        uniprot_id = self.UNIPROT_MAP.get(gene_name)
-        
-        if not uniprot_id:
-            raise ValueError(f"Gene '{gene_name}' not found in AlphaFoldBridge mapping. Available: {list(self.UNIPROT_MAP.keys())}")
+        uniprot_id = self.resolve_uniprot_id(gene_name)
             
         # Try fetching the dynamically versioned pdbUrl from the EBI API first
         api_url = f"https://alphafold.ebi.ac.uk/api/prediction/{uniprot_id}"

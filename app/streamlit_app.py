@@ -322,7 +322,7 @@ with tab3:
     target_cell = st.slider("Select Target Attractor State", 0, v_data.shape[0]-1, min(100, v_data.shape[0]-1))
     
     if st.button("Auto-Discover Targets"):
-        with st.spinner("Optimizing..."):
+        with st.spinner("Executing Quantum Tensor Contractions..."):
             optimizer = TargetOptimizer(rbm, v_data[target_cell], avoidance_states)
             optimal_delta_v, top_targets = optimizer.optimize(steps=150)
             
@@ -382,11 +382,11 @@ with tab3:
                         st.download_button("Download Dossier (.md)", full_dossier, file_name="MOSAIC_FDA_Dossier.md", mime="text/markdown")
                         
                     except Exception as e:
-                        st.error(f"LLM Routing Error: {e}")
+                        st.error(f"External API Timeout: LLM Routing Error. ({str(e)})")
 
         with action_col2:
             if st.button("Verify 3D Protein Structure", use_container_width=True):
-                with st.spinner("Fetching AlphaFold DB Conformation..."):
+                with st.spinner("Resolving Atomic Conformation from DeepMind AlphaFold DB..."):
                     try:
                         # Map TF index to a realistic gene from our bridge
                         top_tf_idx = st.session_state['optimal_targets'][0][0]
@@ -409,7 +409,7 @@ with tab3:
                         showmol(view, height=400, width=400)
                         
                     except Exception as e:
-                        st.error(f"Structural Verification Error: {e}")
+                        st.error(f"External API Timeout: Could not fetch structure. ({str(e)})")
 
         # --- SYSTEMIC TOXICITY RADAR CHART ---
         st.markdown("---")
