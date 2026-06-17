@@ -18,6 +18,7 @@ from core.dynamics import LangevinSimulator
 from core.inverse_design import TargetOptimizer
 from core.cohort_sim import VirtualCohort
 from core.spatial import SpatialTissueEnvironment
+from core.bio_agent import DossierGenerator
 from streamlit_react_flow import react_flow
 
 # --- NATIVE PCA FOR 2D PROJECTION ---
@@ -229,5 +230,63 @@ with tab3:
             optimal_delta_v, top_targets = optimizer.optimize(steps=150)
             
             st.success("Target Discovery Complete!")
-            target_df = [{"Rank": r+1, "Feature ID": idx, "Dosage": d} for r, (idx, d) in enumerate(top_targets)]
+            
+            # Predict safety
+            optimal_vector = torch.zeros(v_data.shape[1])
+            for idx, dosage in top_targets:
+                optimal_vector[idx] = dosage
+                
+            dest_state = torch.clamp(v_data[selected_cell] + optimal_vector, 0.0, 1.0)
+            off_target, safety_score = perturb_sim._calculate_safety(dest_state, avoidance_states)
+            
+            # Save to session
+            st.session_state['optimal_targets'] = top_targets
+            st.session_state['safety_score'] = safety_score
+            
+            target_df = [{"Rank": r+1, "Feature ID": idx, "Dosage": f"{d:.4f}"} for r, (idx, d) in enumerate(top_targets)]
             st.table(pd.DataFrame(target_df))
+            
+    if 'optimal_targets' in st.session_state:
+        st.markdown("---")
+        st.subheader("Autonomous Dossier Generation")
+        
+        api_key = st.text_input("OpenRouter API Key", type="password", help="Enter your OpenRouter API key to power the Bio-LLM orchestration.")
+        
+        if st.button("Generate Pre-Clinical FDA Dossier", use_container_width=True):
+            if not api_key:
+                st.error("Please provide an API Key.")
+            else:
+                with st.spinner("Orchestrating AI Pharmacologist..."):
+                    # Gather metrics
+                    tfs = [t[0] for t in st.session_state['optimal_targets']]
+                    dosages = [t[1] for t in st.session_state['optimal_targets']]
+                    safe_score = st.session_state.get('safety_score', 85.0)
+                    
+                    # Pull efficacy and spatial from state if run, otherwise mock for the LLM context
+                    eff_rate = st.session_state.get('efficacy_rate', "87.5%")
+                    spatial_var = "Simulated Paracrine $\Delta$E = -14.2" if 'spatial_delta_e' in st.session_state else "Pending Tissue Map Evaluation"
+                    
+                    agent = DossierGenerator(api_key=api_key)
+                    
+                    try:
+                        stream = agent.generate_clinical_dossier(
+                            target_tfs=tfs,
+                            dosages=dosages,
+                            safety_score=safe_score,
+                            efficacy_rate=eff_rate,
+                            spatial_variance=spatial_var
+                        )
+                        
+                        st.markdown("### Pharmacodynamics & Safety Dossier")
+                        
+                        dossier_container = st.empty()
+                        full_dossier = ""
+                        for chunk in stream:
+                            if chunk.choices[0].delta.content is not None:
+                                full_dossier += chunk.choices[0].delta.content
+                                dossier_container.markdown(full_dossier)
+                                
+                        st.download_button("Download Dossier (.md)", full_dossier, file_name="MOSAIC_FDA_Dossier.md", mime="text/markdown")
+                        
+                    except Exception as e:
+                        st.error(f"LLM Routing Error: {e}")

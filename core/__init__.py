@@ -7,6 +7,7 @@ from .dynamics import LangevinSimulator
 from .inverse_design import TargetOptimizer
 from .cohort_sim import VirtualCohort
 from .spatial import SpatialTissueEnvironment
+from .bio_agent import DossierGenerator
 
 __all__ = [
     'MultiOmicTensor',
@@ -16,5 +17,6 @@ __all__ = [
     'LangevinSimulator',
     'TargetOptimizer',
     'VirtualCohort',
-    'SpatialTissueEnvironment'
+    'SpatialTissueEnvironment',
+    'DossierGenerator'
 ]
