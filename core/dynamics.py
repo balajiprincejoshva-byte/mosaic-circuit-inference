@@ -11,19 +11,21 @@ class LangevinSimulator:
         self.rbm.eval()
         self.temperature = temperature
 
-    def step_forward(self, v_current: torch.Tensor, dt: float = 0.01) -> torch.Tensor:
+    def step_forward(self, v_current: torch.Tensor, dt: float = 0.01, spatial_env=None) -> torch.Tensor:
         """
         Calculates the next state of the cell vector over delta_t.
         v_{t+1} = v_t - nabla F(v) * dt + sqrt(2 * T * dt) * noise
+        If spatial_env is provided, calculates the coupled spatial gradient.
         """
-        # Ensure we don't mutate the original in-place unintentionally
-        v = v_current.clone()
+        # Ensure v_current requires grad to compute the exact analytical gradient via PyTorch
+        v = v_current.clone().detach().requires_grad_(True)
         
-        # Calculate analytical gradient nabla F(v)
-        # dF/dv = -b - W * sigmoid(c + v W)^T
-        hidden_activation = torch.nn.functional.linear(v, self.rbm.W.t(), self.rbm.h_bias)
-        h_prob = torch.sigmoid(hidden_activation)
-        grad_f = -self.rbm.v_bias - torch.matmul(h_prob, self.rbm.W.t())
+        # Calculate Free Energy (incorporates Mean-Field spatial coupling if provided)
+        energy = self.rbm.calculate_free_energy(v, spatial_env)
+        
+        # Autograd dynamically computes the exact gradient nabla F(v)
+        # We sum the energies to compute independent gradients for all cells simultaneously in parallel
+        grad_f = torch.autograd.grad(energy.sum(), v)[0]
         
         # Generate Gaussian thermal noise
         # Shape matches v
@@ -40,12 +42,10 @@ class LangevinSimulator:
         
         return v_next
 
-    def simulate_trajectory(self, v_start: torch.Tensor, steps: int = 100, dt: float = 0.01, target_gene_idx: int = None, target_gene_value: float = None) -> torch.Tensor:
+    def simulate_trajectory(self, v_start: torch.Tensor, steps: int = 100, dt: float = 0.01, target_gene_idx: int = None, target_gene_value: float = None, spatial_env=None) -> torch.Tensor:
         """
-        Simulates the trajectory of a cell from v_start.
-        Returns a time-series matrix of shape (steps + 1, num_visible).
-        If target_gene_idx is provided, forces that node to target_gene_value 
-        at each step to simulate an active clamp (knockout/overexpression).
+        Simulates the trajectory of a cell or tissue grid from v_start.
+        Returns a time-series matrix of shape (steps + 1, ..., num_visible).
         """
         trajectory = [v_start.clone().squeeze()]
         v_current = v_start.clone().unsqueeze(0) if v_start.dim() == 1 else v_start.clone()
@@ -56,7 +56,7 @@ class LangevinSimulator:
             trajectory[0] = v_current.clone().squeeze()
             
         for _ in range(steps):
-            v_current = self.step_forward(v_current, dt=dt)
+            v_current = self.step_forward(v_current, dt=dt, spatial_env=spatial_env)
             
             # Enforce perturbation clamp during relaxation
             if target_gene_idx is not None and target_gene_value is not None:
@@ -64,5 +64,5 @@ class LangevinSimulator:
                 
             trajectory.append(v_current.clone().squeeze())
             
-        # Stack into (steps+1, V)
+        # Stack into (steps+1, ...)
         return torch.stack(trajectory)

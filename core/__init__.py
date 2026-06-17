@@ -6,6 +6,7 @@ from .perturbation import PerturbationSimulator
 from .dynamics import LangevinSimulator
 from .inverse_design import TargetOptimizer
 from .cohort_sim import VirtualCohort
+from .spatial import SpatialTissueEnvironment
 
 __all__ = [
     'MultiOmicTensor',
@@ -14,5 +15,6 @@ __all__ = [
     'PerturbationSimulator',
     'LangevinSimulator',
     'TargetOptimizer',
-    'VirtualCohort'
+    'VirtualCohort',
+    'SpatialTissueEnvironment'
 ]

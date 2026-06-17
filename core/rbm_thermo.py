@@ -19,6 +19,10 @@ class MultiOmicRBM(nn.Module):
         self.v_bias = nn.Parameter(torch.zeros(num_visible))
         # Hidden bias (c)
         self.h_bias = nn.Parameter(torch.zeros(num_hidden))
+        
+        # Spatial Coupling Weight Matrix
+        self.W_spatial = nn.Parameter(torch.randn(num_hidden, num_hidden) * 0.01)
+        self.gamma = 1.0 # Spatial coupling coefficient
 
     def forward(self, v: torch.Tensor) -> torch.Tensor:
         """
@@ -57,18 +61,33 @@ class MultiOmicRBM(nn.Module):
         
         return -(v_term + h_term + w_term)
 
-    def calculate_free_energy(self, v: torch.Tensor) -> torch.Tensor:
+    def calculate_free_energy(self, v: torch.Tensor, spatial_env=None) -> torch.Tensor:
         """
         Returns scalar free energy (basin of attraction) for any given cell state vector.
-        F(v) = -b^T v - sum_j log(1 + exp(c_j + v^T W_{:, j}))
-        Returns scalar free energy per sample, shape (Batch,)
+        If spatial_env is provided, uses the Mean-Field approximation to incorporate 
+        spatial neighborhood coupling.
+        F(v_i) = -b^T v_i - sum_k log(1 + exp(c_k + W_{:,k}^T v_i + I_{ik}))
         """
         v_term = torch.matmul(v, self.v_bias)
-        # linear projection of v onto h space + h_bias -> c + vW
-        hidden_activation = F.linear(v, self.W.t(), self.h_bias)
+        
+        # Linear projection of v onto h space -> c + vW
+        hidden_activation = torch.nn.functional.linear(v, self.W.t(), self.h_bias)
+        
+        if spatial_env is not None:
+            # Mean-field approximation: compute expected hidden states
+            h_mean = torch.sigmoid(hidden_activation) # (N, H)
+            
+            # Neighborhood influence sum_j K_ij h_j
+            neighbor_h_sum = spatial_env.get_neighborhood_influence(h_mean) # (N, H)
+            
+            # Spatial interaction field I_i = gamma * sum_j K_ij W_spatial h_j
+            spatial_field = self.gamma * torch.matmul(neighbor_h_sum, self.W_spatial) # (N, H)
+            
+            # Add spatial field to hidden activation
+            hidden_activation = hidden_activation + spatial_field
         
         # Softplus is exactly log(1 + exp(x))
-        h_term = torch.sum(F.softplus(hidden_activation), dim=1)
+        h_term = torch.sum(torch.nn.functional.softplus(hidden_activation), dim=1)
         
         return -(v_term + h_term)
 
@@ -148,6 +167,7 @@ class MultiOmicRBM(nn.Module):
         self.base_W = self.W.detach().clone()
         self.base_v_bias = self.v_bias.detach().clone()
         self.base_h_bias = self.h_bias.detach().clone()
+        self.base_W_spatial = self.W_spatial.detach().clone()
 
     def apply_epigenetic_erosion(self, erosion_factor: float):
         """
@@ -160,3 +180,4 @@ class MultiOmicRBM(nn.Module):
             self.W.copy_(self.base_W * (1.0 - erosion_factor))
             self.v_bias.copy_(self.base_v_bias * (1.0 - erosion_factor))
             self.h_bias.copy_(self.base_h_bias * (1.0 - erosion_factor))
+            self.W_spatial.copy_(self.base_W_spatial * (1.0 - erosion_factor))

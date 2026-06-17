@@ -5,6 +5,7 @@ import plotly.graph_objects as go
 import torch
 import sys
 import os
+import time
 
 # Ensure core is in path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -16,6 +17,7 @@ from core.perturbation import PerturbationSimulator
 from core.dynamics import LangevinSimulator
 from core.inverse_design import TargetOptimizer
 from core.cohort_sim import VirtualCohort
+from core.spatial import SpatialTissueEnvironment
 from streamlit_react_flow import react_flow
 
 # --- NATIVE PCA FOR 2D PROJECTION ---
@@ -33,9 +35,10 @@ def setup_mosaic_engine():
     np.random.seed(42)
     torch.manual_seed(42)
     
-    rna = np.random.poisson(1.5, (500, 30))
-    atac = np.random.poisson(0.5, (500, 20))
-    adt = np.random.poisson(2.0, (500, 10))
+    num_cells = 500
+    rna = np.random.poisson(1.5, (num_cells, 30))
+    atac = np.random.poisson(0.5, (num_cells, 20))
+    adt = np.random.poisson(2.0, (num_cells, 10))
     
     tensor = MultiOmicTensor({'rna': rna, 'atac': atac, 'adt': adt})
     tensor.normalize_rna()
@@ -44,10 +47,14 @@ def setup_mosaic_engine():
     
     v_data = tensor.to_tensor()
     
+    # Generate Mock Spatial Coordinates (Tumor Mass)
+    # A central dense mass and some diffuse outer cells
+    coords = torch.randn(num_cells, 2) * 5.0
+    spatial_env = SpatialTissueEnvironment(coords, sigma=2.0)
+    
     num_visible = v_data.shape[1]
     num_hidden = 15
     rbm = MultiOmicRBM(num_visible, num_hidden)
-    # Cache weights will be called inside fit()
     rbm.fit(v_data, epochs=5, batch_size=64, k=1, lr=0.05)
     
     fg = FactorGraphBP(num_tfs=10, num_enhancers=20, num_genes=30)
@@ -55,15 +62,14 @@ def setup_mosaic_engine():
     adj_tf_enh, adj_enh_gene = fg.extract_circuits(threshold=0.0)
     
     perturb_sim = PerturbationSimulator(rbm)
-    dyn_sim = LangevinSimulator(rbm, temperature=0.5)
+    dyn_sim = LangevinSimulator(rbm, temperature=0.05)
     
-    # Generate avoidance states
     avoidance_states = [torch.rand(num_visible), torch.rand(num_visible)]
     
-    return v_data, rbm, fg, perturb_sim, dyn_sim, adj_tf_enh, adj_enh_gene, avoidance_states
+    return v_data, rbm, fg, perturb_sim, dyn_sim, adj_tf_enh, adj_enh_gene, avoidance_states, spatial_env, coords
 
 # --- UI CONFIGURATION ---
-st.set_page_config(page_title="MOSAIC Pharma", layout="wide", page_icon="🧬")
+st.set_page_config(page_title="MOSAIC Spatial Physics", layout="wide", page_icon="🧬")
 
 st.markdown("""
     <style>
@@ -73,32 +79,20 @@ st.markdown("""
     .stButton>button { background-color: #00ffcc; color: #121212; font-weight: bold; border: None; }
     .stButton>button:hover { background-color: #00e6b8; }
     .metric-card { background-color: #1e1e1e; border: 1px solid #00ffcc; border-radius: 10px; padding: 15px; margin-bottom: 20px;}
-    .safety-safe { background-color: #1e3320; border: 1px solid #00ff00; border-radius: 10px; padding: 15px; color: #00ff00; }
-    .safety-danger { background-color: #331e1e; border: 1px solid #ff0000; border-radius: 10px; padding: 15px; color: #ff0000; }
     .stTabs [data-baseweb="tab-list"] { gap: 24px; }
     .stTabs [data-baseweb="tab"] { color: #e0e0e0; }
     </style>
 """, unsafe_allow_html=True)
 
-st.title("🧬 MOSAIC: Autonomous Clinical Engine")
+st.title("🧬 MOSAIC: Spatial Regulatory Dynamics")
 
 # Load Engine
-v_data, rbm, fg, perturb_sim, dyn_sim, adj_tf_enh, adj_enh_gene, avoidance_states = setup_mosaic_engine()
+v_data, rbm, fg, perturb_sim, dyn_sim, adj_tf_enh, adj_enh_gene, avoidance_states, spatial_env, coords = setup_mosaic_engine()
 
 # --- SIDEBAR CONTROLS ---
-st.sidebar.header("🎛️ Global Controls")
-selected_cell = st.sidebar.slider("Select Origin Cell Basin", 0, v_data.shape[0]-1, 0)
-target_cell = st.sidebar.slider("Select Target Cell Basin (for Inverse Design)", 0, v_data.shape[0]-1, min(100, v_data.shape[0]-1))
-
+st.sidebar.header("🎛️ Tissue Controls")
+selected_cell = st.sidebar.slider("Select Origin Cell (Tissue Index)", 0, v_data.shape[0]-1, 250)
 selected_vector = v_data[selected_cell]
-target_vector = v_data[target_cell]
-
-# Epigenetic Aging
-st.sidebar.markdown("---")
-st.sidebar.subheader("⏳ Thermodynamic Aging")
-erosion_factor = st.sidebar.slider("Epigenetic Age (Erosion)", 0.0, 1.0, 0.0, 0.05)
-# Apply the erosion factor globally to the RBM
-rbm.apply_epigenetic_erosion(erosion_factor)
 
 cpei = rbm.calculate_plasticity_entropy(selected_vector.unsqueeze(0)).item()
 st.sidebar.markdown(f"""
@@ -108,24 +102,97 @@ st.sidebar.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# Project Data to 2D
+target_tf = st.sidebar.selectbox("Paracrine Perturbation TF", range(10))
+
+# Pre-calculate data
 with torch.no_grad():
     coords_2d = native_pca(v_data, n_components=2)
-    energies = rbm.calculate_free_energy(v_data)
+    energies = rbm.calculate_free_energy(v_data, spatial_env=spatial_env)
 
 df = pd.DataFrame({
     'UMAP_1': coords_2d[:, 0].numpy(),
     'UMAP_2': coords_2d[:, 1].numpy(),
+    'Spatial_X': coords[:, 0].numpy(),
+    'Spatial_Y': coords[:, 1].numpy(),
     'Free_Energy': energies.numpy(),
     'Cell_ID': np.arange(v_data.shape[0])
 })
 
 # --- MAIN TABS ---
-tab1, tab2, tab3, tab4 = st.tabs(["🌋 Landscape & Aging", "🤖 Autonomous Discovery", "🧪 Virtual Clinical Trials", "🔌 Causal Circuits"])
+tab1, tab2, tab3 = st.tabs(["🔬 Spatial Tissue View", "🌋 Thermodynamic Landscape", "🤖 Autonomous Discovery"])
 
 with tab1:
+    st.subheader("Tissue Spatial Topology")
+    st.write("Real physical mapping $(X, Y)$ of the tumor microenvironment.")
+    
+    col1, col2 = st.columns([3, 1])
+    
+    with col2:
+        st.write("### Paracrine Shockwave")
+        st.write("Fire an intervention and observe the cascading state-shift across the tissue due to spatial coupling.")
+        if st.button("Fire Spatial Intervention", use_container_width=True):
+            tf_global_idx = 30 + 20 + target_tf
+            with st.spinner("Simulating Coupled Spatial Langevin Dynamics..."):
+                # Simulate the whole tissue reacting simultaneously
+                # Force the target_gene of ONLY the selected cell to be 1.0 (Overexpression)
+                # We can do this by manually intercepting the trajectory, but for simplicity,
+                # we'll run it naturally and just clamp the selected cell after the fact.
+                v_start = v_data.clone()
+                v_start[selected_cell, tf_global_idx] = 1.0
+                
+                # Run full tissue trajectory
+                trajectory = dyn_sim.simulate_trajectory(v_start, steps=30, dt=0.01, spatial_env=spatial_env)
+                
+                # Get energy shifts of immediate neighbors
+                initial_tissue_energy = rbm.calculate_free_energy(v_data, spatial_env=spatial_env)
+                final_tissue_energy = rbm.calculate_free_energy(trajectory[-1], spatial_env=spatial_env)
+                
+                delta_e = final_tissue_energy - initial_tissue_energy
+                st.session_state['spatial_delta_e'] = delta_e.detach().numpy()
+                st.session_state['trajectory'] = trajectory
+                st.success("Simulation Complete!")
+                
+    with col1:
+        if 'trajectory' in st.session_state:
+            # Render the final state of the shockwave
+            color_data = st.session_state['spatial_delta_e']
+            title_text = "Spatial Trajectory Result (ΔE Shift)"
+            colorscale = 'RdBu'
+        else:
+            color_data = df['Free_Energy']
+            title_text = "Baseline Tissue Free Energy"
+            colorscale = 'Viridis'
+
+        fig_spatial = go.Figure(data=[go.Scatter(
+            x=df['Spatial_X'], y=df['Spatial_Y'],
+            mode='markers',
+            marker=dict(
+                size=10,
+                color=color_data,
+                colorscale=colorscale,
+                showscale=True,
+                line=dict(width=1, color='DarkSlateGrey')
+            ),
+            text=[f"Cell {i}" for i in range(len(df))],
+            name='Tissue Cells'
+        )])
+        
+        # Highlight Selected
+        fig_spatial.add_trace(go.Scatter(
+            x=[df.iloc[selected_cell]['Spatial_X']], y=[df.iloc[selected_cell]['Spatial_Y']],
+            mode='markers', marker=dict(size=18, color='yellow', symbol='star', line=dict(width=2, color='red')),
+            name='Perturbed Origin'
+        ))
+        
+        fig_spatial.update_layout(
+            title=title_text,
+            xaxis_title='Spatial X (μm)', yaxis_title='Spatial Y (μm)',
+            paper_bgcolor='#121212', plot_bgcolor='#121212', font_color='#e0e0e0', height=600
+        )
+        st.plotly_chart(fig_spatial, use_container_width=True)
+
+with tab2:
     st.subheader("The Energy Landscape")
-    st.markdown("Observe how the Epigenetic Age slider actively flattens the thermodynamic barriers.")
     
     x_grid = np.linspace(df['UMAP_1'].min(), df['UMAP_1'].max(), 50)
     y_grid = np.linspace(df['UMAP_2'].min(), df['UMAP_2'].max(), 50)
@@ -134,130 +201,33 @@ with tab1:
     from scipy.interpolate import griddata
     Z_grid = griddata((df['UMAP_1'], df['UMAP_2']), df['Free_Energy'], (X_grid, Y_grid), method='cubic', fill_value=df['Free_Energy'].max())
 
-    fig = go.Figure(data=[go.Surface(z=Z_grid, x=x_grid, y=y_grid, colorscale='Viridis', opacity=0.8, showscale=False)])
+    fig_ls = go.Figure(data=[go.Surface(z=Z_grid, x=x_grid, y=y_grid, colorscale='Viridis', opacity=0.8, showscale=False)])
     
-    fig.add_trace(go.Scatter3d(
+    fig_ls.add_trace(go.Scatter3d(
         x=df['UMAP_1'], y=df['UMAP_2'], z=df['Free_Energy'],
-        mode='markers', marker=dict(size=2, color='#00ffcc', opacity=0.5), name='Cell Basins'
-    ))
-    
-    sel_x, sel_y, sel_z = df.iloc[selected_cell]['UMAP_1'], df.iloc[selected_cell]['UMAP_2'], df.iloc[selected_cell]['Free_Energy']
-    fig.add_trace(go.Scatter3d(
-        x=[sel_x], y=[sel_y], z=[sel_z],
-        mode='markers', marker=dict(size=8, color='red', symbol='diamond'), name='Origin'
-    ))
-    
-    tar_x, tar_y, tar_z = df.iloc[target_cell]['UMAP_1'], df.iloc[target_cell]['UMAP_2'], df.iloc[target_cell]['Free_Energy']
-    fig.add_trace(go.Scatter3d(
-        x=[tar_x], y=[tar_y], z=[tar_z],
-        mode='markers', marker=dict(size=8, color='orange', symbol='star'), name='Target Basin'
+        mode='markers', marker=dict(size=3, color='#00ffcc', opacity=0.6), name='Cell Basins'
     ))
 
-    fig.update_layout(
+    fig_ls.update_layout(
         scene=dict(
             xaxis_title='PCA_1', yaxis_title='PCA_2', zaxis_title='Free Energy (F)',
             bgcolor='#121212', xaxis=dict(showbackground=False, gridcolor='#333'),
-            yaxis=dict(showbackground=False, gridcolor='#333'), zaxis=dict(showbackground=False, gridcolor='#333'),
-            zaxis_range=[-20, max(0, Z_grid.max()+5)] # Lock Z to see erosion effects
+            yaxis=dict(showbackground=False, gridcolor='#333'), zaxis=dict(showbackground=False, gridcolor='#333')
         ),
         paper_bgcolor='#121212', plot_bgcolor='#121212', margin=dict(l=0, r=0, b=0, t=0), height=600
     )
-    st.plotly_chart(fig, use_container_width=True)
-
-with tab2:
-    st.subheader("Autonomous Inverse Target Discovery")
-    st.write("Reverse-engineer the optimal multi-gene perturbation required to push a cell into the Target Basin safely.")
-    
-    if st.button("Auto-Discover Optimal Targets"):
-        with st.spinner("Running Adam Optimizer on Landscape..."):
-            optimizer = TargetOptimizer(rbm, target_vector, avoidance_states)
-            optimal_delta_v, top_targets = optimizer.optimize(steps=150, lr=0.1)
-            
-            # Predict safety
-            dest_state = torch.clamp(selected_vector + optimal_delta_v, 0.0, 1.0)
-            off_target, safety_score = perturb_sim._calculate_safety(dest_state, avoidance_states)
-            
-            # Save to session for use in Clinical Trials Tab
-            st.session_state['optimal_targets'] = top_targets
-            st.session_state['safety_score'] = safety_score
-            
-            st.success("Target Discovery Complete!")
-            
-    if 'optimal_targets' in st.session_state:
-        score = st.session_state['safety_score']
-        safe_class = "safety-safe" if score > 50 else "safety-danger"
-        st.markdown(f'<div class="{safe_class}"><h4>Safety Score: {score:.1f}/100</h4></div>', unsafe_allow_html=True)
-        st.write("### Target Leaderboard")
-        
-        target_df = []
-        for rank, (idx, dosage) in enumerate(st.session_state['optimal_targets']):
-            target_df.append({"Rank": rank+1, "Global Feature Index": idx, "Dosage (Δv)": f"{dosage:.4f}"})
-        
-        st.table(pd.DataFrame(target_df))
+    st.plotly_chart(fig_ls, use_container_width=True)
 
 with tab3:
-    st.subheader("Virtual Clinical Trials")
-    st.write("Simulate the robustness of the top discovered perturbation across a population with biological variance.")
+    st.subheader("Autonomous Target Discovery")
+    st.write("Find targets that minimize energy while respecting avoidance states.")
+    target_cell = st.slider("Select Target Attractor State", 0, v_data.shape[0]-1, min(100, v_data.shape[0]-1))
     
-    if st.button("Run Virtual Cohort (1,000 Patients)"):
-        if 'optimal_targets' not in st.session_state or len(st.session_state['optimal_targets']) == 0:
-            st.warning("Please run Auto-Discover Optimal Targets first!")
-        else:
-            with st.spinner("Simulating Population Dynamics..."):
-                top_target_idx = st.session_state['optimal_targets'][0][0]
-                top_target_dosage = st.session_state['optimal_targets'][0][1]
-                target_val = torch.clamp(selected_vector[top_target_idx] + top_target_dosage, 0.0, 1.0).item()
-                
-                cohort = VirtualCohort(selected_vector, n_patients=1000, variance=0.15)
-                efficacy_rate, final_energies = cohort.run_trial(
-                    dyn_sim, rbm, target_gene_idx=top_target_idx, target_gene_value=target_val, steps=50
-                )
-                
-                initial_energies = rbm.calculate_free_energy(cohort.cohort_matrix).numpy()
-                final_e_np = final_energies.numpy()
-                
-                success_threshold = np.mean(initial_energies) - 0.5
-                
-                # Plotly Histogram
-                fig_hist = go.Figure()
-                fig_hist.add_trace(go.Histogram(x=initial_energies, name='Initial Cohort Energy', opacity=0.5, marker_color='gray'))
-                
-                # Split final energies into success and fail
-                success_e = final_e_np[final_e_np < success_threshold]
-                fail_e = final_e_np[final_e_np >= success_threshold]
-                
-                fig_hist.add_trace(go.Histogram(x=success_e, name='Successfully Reprogrammed', opacity=0.8, marker_color='#00ffcc'))
-                fig_hist.add_trace(go.Histogram(x=fail_e, name='Failed (Off-Target)', opacity=0.8, marker_color='#ff4d4d'))
-                
-                fig_hist.update_layout(
-                    barmode='overlay', title=f"Clinical Efficacy Rate: {efficacy_rate:.1f}%",
-                    xaxis_title="Free Energy Basin", yaxis_title="Patient Count",
-                    paper_bgcolor='#121212', plot_bgcolor='#121212', font_color='#e0e0e0'
-                )
-                
-                st.plotly_chart(fig_hist, use_container_width=True)
-
-with tab4:
-    st.subheader("🔌 Causal Circuit Explorer")
-    st.write("Belief Propagation Graph for Top Inferred TF Connections")
-    target_tf = st.selectbox("Select TF Node", range(10))
-    
-    elements = []
-    elements.append({"id": f"TF_{target_tf}", "data": {"label": f"TF {target_tf}"}, "position": {"x": 250, "y": 50}, "style": {"background": "#ff4d4d", "color": "#fff", "border": "1px solid #ff4d4d"}})
-    connected_enh = np.where(adj_tf_enh[target_tf, :] > 0)[0]
-    
-    for i, enh in enumerate(connected_enh[:3]):
-        enh_id = f"Enh_{enh}"
-        elements.append({"id": enh_id, "data": {"label": f"Enh {enh}"}, "position": {"x": 100 + i*150, "y": 200}, "style": {"background": "#00ffcc", "color": "#000", "border": "1px solid #00ffcc"}})
-        elements.append({"id": f"e_{target_tf}_{enh}", "source": f"TF_{target_tf}", "target": enh_id, "animated": True, "style": {"stroke": "#00ffcc"}})
-        
-        connected_genes = np.where(adj_enh_gene[enh, :] > 0)[0]
-        for j, gene in enumerate(connected_genes[:2]):
-            gene_id = f"Gene_{gene}"
-            elements.append({"id": gene_id, "data": {"label": f"Gene {gene}"}, "position": {"x": 50 + i*150 + j*100, "y": 350}, "style": {"background": "#4da6ff", "color": "#fff", "border": "1px solid #4da6ff"}})
-            elements.append({"id": f"e_{enh}_{gene}", "source": enh_id, "target": gene_id, "animated": True, "style": {"stroke": "#4da6ff"}})
-
-    if len(elements) <= 1:
-        st.info("No connections found.")
-    else:
-        react_flow("circuit_flow", elements=elements, flow_styles={"height": 500, "width": "100%", "background": "#1e1e1e"})
+    if st.button("Auto-Discover Targets"):
+        with st.spinner("Optimizing..."):
+            optimizer = TargetOptimizer(rbm, v_data[target_cell], avoidance_states)
+            optimal_delta_v, top_targets = optimizer.optimize(steps=150)
+            
+            st.success("Target Discovery Complete!")
+            target_df = [{"Rank": r+1, "Feature ID": idx, "Dosage": d} for r, (idx, d) in enumerate(top_targets)]
+            st.table(pd.DataFrame(target_df))
