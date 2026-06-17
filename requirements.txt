@@ -12,3 +12,4 @@ py3Dmol
 ipython_genutils
 opt_einsum
 opentrons
+async-lru>=2.0.4
