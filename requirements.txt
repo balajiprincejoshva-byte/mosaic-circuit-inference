@@ -11,3 +11,4 @@ stmol
 py3Dmol
 ipython_genutils
 opt_einsum
+opentrons

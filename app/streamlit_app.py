@@ -23,6 +23,7 @@ from core.bio_agent import DossierGenerator
 from core.structural import AlphaFoldBridge
 from core.quantum_rbm import QuantumInspiredRBM
 from core.systemic import SystemicOrganNetwork
+from core.robotics import OpentronsCompiler
 from streamlit_react_flow import react_flow
 import py3Dmol
 from stmol import showmol
@@ -441,3 +442,26 @@ with tab3:
             margin=dict(l=40, r=40, t=40, b=40)
         )
         st.plotly_chart(fig_radar, use_container_width=True)
+
+        # --- WET-LAB ROBOTIC INTEGRATION (PHASE 10) ---
+        st.markdown("---")
+        st.subheader("Physical Wet-Lab Execution")
+        st.write("Translate the digital therapeutic vector into a physical liquid-handling robotic protocol.")
+        
+        if st.button("🚀 Deploy to Physical Wet-Lab (OT-2)", type="primary", use_container_width=True):
+            with st.spinner("Compiling Opentrons Protocol..."):
+                target_tfs = [t[0] for t in st.session_state['optimal_targets']]
+                dosages = [t[1] for t in st.session_state['optimal_targets']]
+                
+                compiler = OpentronsCompiler()
+                protocol_code = compiler.generate_dispense_protocol(target_tfs, dosages)
+                
+                st.success("Protocol Compiled Successfully!")
+                st.code(protocol_code, language='python')
+                
+                st.download_button(
+                    label="Download OT-2 Protocol (.py)",
+                    data=protocol_code,
+                    file_name="mosaic_ot2_protocol.py",
+                    mime="text/x-python"
+                )
