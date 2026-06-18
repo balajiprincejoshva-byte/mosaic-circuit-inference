@@ -1,3 +1,12 @@
+---
+title: MOSAIC
+emoji: 🧬
+colorFrom: blue
+colorTo: purple
+sdk: docker
+pinned: false
+app_port: 7860
+---
 # 🧬 MOSAIC v1.0
 **Multi-Omic Single-cell Attractor Circuit Inference**
 *A closed-loop biological operating system engineered by PixelForge Studio.*
