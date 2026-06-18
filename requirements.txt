@@ -18,3 +18,4 @@ argon2-cffi==25.1.0
 babel==2.18.0
 wcwidth==0.8.1
 platformdirs==4.4.0
+notebook-shim==0.2.4
