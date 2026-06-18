@@ -13,10 +13,55 @@ app_port: 7860
 
 [Live Telemetry Sandbox (Hugging Face)](https://huggingface.co/spaces/BalajiM020504/mosaic-circuit-inference) • [Architecture Documentation](#-system-architecture) • [Robotic Deployment](#-wet-lab-robotic-execution-phase-10)
 
+<div align="center">
+
+![Python](https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54)
+![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=Streamlit&logoColor=white)
+![PyTorch](https://img.shields.io/badge/PyTorch-%23EE4C2C.svg?style=for-the-badge&logo=PyTorch&logoColor=white)
+![SciPy](https://img.shields.io/badge/SciPy-%230C55A5.svg?style=for-the-badge&logo=scipy&logoColor=white)
+![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=for-the-badge&logo=docker&logoColor=white)
+![OpenAI](https://img.shields.io/badge/OpenAI-412991?style=for-the-badge&logo=openai&logoColor=white)
+
+</div>
+
 ## 🌌 Platform Abstract
 The current paradigm of single-cell analysis treats cells as isolated data points within static clusters. In reality—such as within an evolving solid tumor—a cell is a dynamic physical engine, continuously warped by the thermodynamic fields and signaling gradients of its neighbors.
 
 MOSAIC bridges statistical biophysics, deep generative AI, and liquid-handling hardware automation into a unified pipeline. It abandons legacy clustering, mapping single-cell gene regulatory networks directly into continuous thermodynamic fields using custom Quantum-Inspired Mean-Field Restricted Boltzmann Machines (RBMs). This allows us to not only reverse-engineer cell fate but to automate its physical, wet-lab execution.
+
+## 🏗️ Architecture Overview
+
+```mermaid
+graph TD
+    subgraph "Frontend Interface"
+        UI[Streamlit Telemetry Dashboard]
+    end
+
+    subgraph "Core Physics Engine (Backend)"
+        RBM[RBM Thermodynamic Inference]
+        QRBM[Quantum MPS Tensor Networks]
+        SPATIAL[Spatial Regulatory Dynamics]
+        SYS[Multi-Organ Systemic Pleiotropy]
+    end
+
+    subgraph "Validation & Automation"
+        STRUCT[AlphaFold 3D Verification]
+        BIO[Bio-LLM Autonomous Agent]
+        ROBO[Opentrons v2.13 Compiler]
+    end
+
+    UI --> RBM
+    UI --> STRUCT
+    
+    RBM --> QRBM
+    RBM --> SPATIAL
+    
+    QRBM --> SYS
+    SPATIAL --> BIO
+    SYS --> BIO
+    
+    BIO --> ROBO
+```
 
 ## 🚀 Core Engine Capabilities
 
