@@ -1,91 +1,100 @@
----
-title: MOSAIC
-emoji: 🧬
-colorFrom: blue
-colorTo: purple
-sdk: docker
-pinned: false
-app_port: 7860
----
+# 🧬 MOSAIC v1.0
+**Multi-Omic Single-cell Attractor Circuit Inference**
+*A closed-loop biological operating system engineered by PixelForge Studio.*
 
-<div align="center">
-  <h1>🧬 MOSAIC</h1>
-  <h3>Multi-Omic Single-cell Attractor Circuit Inference</h3>
-  <p><i>A proprietary enterprise platform for continuous thermodynamic cell fate modeling and inverse drug design.</i></p>
-</div>
+[Live Telemetry Sandbox (Hugging Face)](https://huggingface.co/spaces/BalajiM020504/mosaic-circuit-inference) • [Architecture Documentation](#-system-architecture) • [Robotic Deployment](#-wet-lab-robotic-execution-phase-10)
 
----
+## 🌌 Platform Abstract
+The current paradigm of single-cell analysis treats cells as isolated data points within static clusters. In reality—such as within an evolving solid tumor—a cell is a dynamic physical engine, continuously warped by the thermodynamic fields and signaling gradients of its neighbors.
 
-## 🌌 The Paradigm Shift: Thermodynamics vs. Clustering
-Legacy bioinformatics pipelines (e.g., Scanpy, Seurat) rely on static, discrete clustering algorithms (Louvain, Leiden) to categorize cell types. However, biology is not discrete—it is a continuous physical process governed by energy gradients. 
+MOSAIC bridges statistical biophysics, deep generative AI, and liquid-handling hardware automation into a unified pipeline. It abandons legacy clustering, mapping single-cell gene regulatory networks directly into continuous thermodynamic fields using custom Quantum-Inspired Mean-Field Restricted Boltzmann Machines (RBMs). This allows us to not only reverse-engineer cell fate but to automate its physical, wet-lab execution.
 
-**MOSAIC** discards clustering entirely. Instead, it models cellular differentiation as a dynamic journey across a continuous thermodynamic energy landscape. Using principles from statistical physics, MOSAIC maps the high-dimensional omic vector of a cell into a basin of attraction, allowing researchers to physically simulate, predict, and reverse-engineer cell fate transitions.
+## 🚀 Core Engine Capabilities
 
----
+1. **Quantum-Inspired Systemic Pleiotropy (Phases 8 & 9)**
+Scales target discovery from single cells to whole-body networks. Using low-rank Matrix Product State (MPS) tensor networks via `opt_einsum`, the backend computes real-time collateral toxicity across Target, Cardiac, Neural, and Hepatic tissues. It utilizes stable, deterministic sinusoidal baselines to represent unique homeostatic basins, preventing memory bottlenecks during massive system state contractions.
 
-## 🔬 Scientific Methodology
+2. **Spatial Regulatory Dynamics (Phase 5)**
+Upgrades standard RBMs with a Mean-Field Approximation to compute an $\mathcal{O}(N^2)$ physical distance matrix via a Gaussian RBF kernel. Simulate and animate how a sparse gene intervention applied to a single cell creates an energetic paracrine shockwave, pulling neighboring cells out of their stable attractors.
 
-MOSAIC is powered by three mathematical engines:
+3. **Dynamic AlphaFold & UniProt Verification (Phase 7)**
+Moving from statistical mechanics to physical reality. The pipeline dynamically queries the public UniProt REST API to resolve standard human gene symbols to primary accession IDs, streaming interactive, rotatable 3D atomic structures directly from the DeepMind AlphaFold Database via `py3Dmol`.
 
-### 1. Thermodynamic State Modeling (RBM Free Energy)
-We capture the joint multi-omic distribution of a cell using a Restricted Boltzmann Machine (RBM). The scalar Free Energy $F(v)$ of any cell vector $v$ defines its stability (basin of attraction).
-```math
-F(v) = -b^T v - \sum_{j} \log(1 + \exp(c_j + W_{:, j}^T v))
-```
-*Where $W$ is the interaction weight matrix, and $b, c$ are the visible and hidden biases, respectively.*
+4. **Autonomous Pre-Clinical Documentation (Phase 6)**
+Built-in regulatory intelligence. MOSAIC routes calculated thermodynamic energy landscapes, perturbation dosages, and systemic toxicity metrics straight to an integrated Bio-LLM agent. The agent autonomously authors structured, exportable FDA-style pre-clinical pharmacodynamics dossiers.
 
-### 2. Time-Series Trajectory (Langevin Dynamics)
-To predict how a cell will physically respond over time to a multi-gene perturbation, we simulate its descent down the energy gradient using the Euler-Maruyama discretization of Langevin dynamics:
-```math
-v_{t+\Delta t} = v_t - \nabla_v F(v_t) \Delta t + \sqrt{2T \Delta t} \cdot \mathcal{N}(0, 1)
-```
-*Where $T$ is the thermodynamic temperature (biological stochasticity) and $\nabla_v F(v)$ is the analytical gradient of the Free Energy landscape.*
+5. **Closed-Loop Robotic Execution (Phase 10)**
+Closing the final physical gap. Once the Adam-driven inverse design optimizer isolates a sparse target vector, MOSAIC automatically generates and exports an executable Opentrons API v2.13 Python protocol, ready for immediate physical 96-well plate fluid handling on an OT-2 liquid robot.
 
-### 3. Autonomous Target Discovery (Inverse Design)
-To discover the optimal perturbation required to push a cell into a Target basin safely, MOSAIC utilizes gradient descent on the landscape itself. We optimize a continuous dosage vector $\Delta v$ using the following loss function:
-```math
-\mathcal{L}(\Delta v) = F(v_{target} + \Delta v) - \lambda \sum_{a \in A} F(v_{avoid, a} + \Delta v) + \alpha \|\Delta v\|_1
-```
-*Where $A$ is a set of dangerous Avoidance states (e.g., malignant attractors). The $\lambda$ parameter enforces Collateral Pleiotropy limits, while the L1 penalty ($\alpha$) ensures sparse, highly specific drug targets.*
+## 📊 Visual Telemetry
+*(Note: Replace the placeholder image URLs below with your actual project screenshots and GIFs once uploaded to your repository)*
 
----
+| Thermodynamic Landscape | Systemic Toxicity Radar |
+| :---: | :---: |
+| Continuous energy topography modeled via RBM inference. Deep wells represent stable cellular attractors. | Collateral multi-organ toxicity mapped via quantum tensor emulation. |
 
-## 🏗️ Architecture & Zero-Dependency Stack
+| Structural Validation (AlphaFold) | Wet-Lab Execution (OT-2) |
+| :---: | :---: |
+| Real-time DeepMind DB resolution of targeted transcription factors directly in the dashboard. | Dynamically compiled OpenTrons protocol for physical 96-well plate dispensing. |
 
-MOSAIC was built from the ground up to be ultra-fast and strictly mathematical. 
-**Zero legacy bioinformatics libraries** (Scanpy, AnnData, Mudata, NetworkX) are used.
+## 🧮 Mathematical Foundation
+MOSAIC models the probability of a cellular state vector $\mathbf{v}$ using a Restricted Boltzmann Machine framework, where the free energy $F(\mathbf{v})$ is defined as:
 
-**Core Stack:**
-*   `PyTorch` (RBM, Inverse Design Autograd, Langevin Dynamics)
-*   `NumPy` & `SciPy` (Loopy Belief Propagation Matrix Operations)
-*   `Streamlit` & `Plotly` (Enterprise Telemetry & 3D Visualization)
+$$F(\mathbf{v}) = - \mathbf{a}^T \mathbf{v} - \sum_{j} \log \left( 1 + \exp \left( b_j + \mathbf{W}_j^T \mathbf{v} \right) \right)$$
 
-### Deterministic Production Versions (Strict Pinning)
-To guarantee zero pip backtracking and a 100% reproducible build environment (especially for Docker/Hugging Face deployments), **every single transitive dependency (150+ packages) is strictly pinned.** 
+To calculate Spatial Regulatory Dynamics across a simulated tissue microenvironment, the environmental energy coupling $\Delta E_{env}$ is defined using a Gaussian Radial Basis Function (RBF) to represent paracrine signaling decay over distance:
 
-This includes all core packages as well as sub-dependencies that commonly cause version resolution glitches (such as `babel`, `wcwidth`, `async-lru`, and `argon2-cffi`). 
-If you need to add upcoming tools or new libraries in the future, please ensure you use `pip freeze` locally and hard-pin their exact resolved versions in `requirements.txt` before deploying.
-*(See `requirements.txt` for the full locked dependency graph)*
----
+$$\Delta E_{env}^{i} = \lambda \sum_{j \neq i} K(\mathbf{x}_i, \mathbf{x}_j) \left( \mathbf{v}_i \cdot \mathbf{v}_j \right) \quad \text{where} \quad K(\mathbf{x}_i, \mathbf{x}_j) = \exp\left(-\frac{\|\mathbf{x}_i - \mathbf{x}_j\|^2}{2\sigma^2}\right)$$
 
-## 🚀 Quick Start
+## 🛠️ Installation & Setup
+To run the MOSAIC operating system locally, ensure you have Python 3.10+ installed.
 
-### Hugging Face / Docker Deployment
-MOSAIC is packaged with an optimized CPU-wheel `Dockerfile` for instantaneous deployment on Hugging Face Spaces.
+1. **Clone the Repository**:
 ```bash
-# Build the container
-docker build -t mosaic-engine .
-
-# Run the UI on port 7860
-docker run -p 7860:7860 mosaic-engine
+git clone https://github.com/balajiprincejoshva-byte/mosaic-circuit-inference.git
+cd mosaic-circuit-inference
 ```
-
-### Local Virtual Environment
-If you prefer standard python execution:
+2. **Create a Virtual Environment & Install Dependencies**:
 ```bash
-# Install strict requirements
-pip install -r requirements.txt
-
-# Launch the God-Tier Laboratory
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install --no-cache-dir -r requirements.txt
+```
+3. **Configure Environment Variables**:
+MOSAIC requires an OpenRouter API key for the Phase 6 AI Dossier generation to run natively.
+```bash
+export OPENROUTER_API_KEY="sk-or-v1-your-key-here"
+```
+4. **Launch the Telemetry Dashboard**:
+```bash
 streamlit run app/streamlit_app.py
 ```
+
+## 📁 System Architecture
+The repository is modularized into a decoupled frontend interface and a high-performance backend physics engine:
+```text
+mosaic-circuit-inference/
+├── app/
+│   └── streamlit_app.py       # Main UI loop, glassmorphic layout, UI telemetry, loader injection
+├── core/
+│   ├── rbm_thermo.py          # Standard Dense RBM physics engine
+│   ├── quantum_rbm.py         # Phase 9: Matrix Product State tensor compression
+│   ├── spatial.py             # Phase 5: RBF distance matrices & paracrine shockwaves
+│   ├── systemic.py            # Phase 8: Multi-organ (Cardiac, Neural, Hepatic) baseline networks
+│   ├── structural.py          # Phase 7: UniProt REST & AlphaFold EBI bridges
+│   ├── bio_agent.py           # Phase 6: Autonomous FDA-style dossier generation
+│   └── robotics.py            # Phase 10: Opentrons protocol compiler
+├── tests/
+│   └── test_physics.py        # Systemic & Tensor mathematics validation
+├── Dockerfile                 # Containerization for Hugging Face Spaces deployment
+├── requirements.txt           # Strict dependency locks (torch, opentrons, opt_einsum)
+└── README.md
+```
+
+## 🔬 Wet-Lab Robotic Execution (Phase 10)
+MOSAIC isn't just a simulation. By clicking "Deploy to Physical Wet-Lab" within the Autonomous Discovery tab, the platform converts its mathematically derived multi-gene perturbation vectors into physical volume measurements.
+
+It automatically generates a `mosaic_ot2_protocol.py` script adhering to the Opentrons API v2.13 schema. This script manages hardware initialization, 96-well flat plate staging, and automated pipette transfers (`p300_single_gen2`) to execute the intervention flawlessly in a physical laboratory environment.
+
+## 📜 License
+Distributed under the MIT License. See `LICENSE` for more information.
