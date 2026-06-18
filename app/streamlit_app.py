@@ -116,6 +116,25 @@ if 'splash_shown' not in st.session_state:
           padding-bottom: 40px;
           position: relative;
       ">
+        <div style="flex-grow: 1; display: flex; align-items: center; justify-content: center; width: 100%; padding-top: 20px;">
+            <svg width="70" height="70" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+              <style>
+                .spin-slow { transform-origin: 50% 50%; animation: spin 4s linear infinite; }
+                .spin-fast { transform-origin: 50% 50%; animation: spin 2s linear infinite reverse; }
+                .pulse-glow { animation: pulse 2s ease-in-out infinite; }
+                @keyframes spin { 100% { transform: rotate(360deg); } }
+                @keyframes pulse { 0%, 100% { opacity: 0.6; transform: scale(0.95); } 50% { opacity: 1; transform: scale(1.05); } }
+              </style>
+              <!-- Outer faint ring -->
+              <circle cx="50" cy="50" r="44" stroke="rgba(0, 240, 255, 0.15)" stroke-width="1.5" fill="none" class="pulse-glow"/>
+              <!-- Main rotating orbital -->
+              <circle cx="50" cy="50" r="44" stroke="#00F0FF" stroke-width="2" fill="none" stroke-dasharray="80 200" stroke-linecap="round" class="spin-slow"/>
+              <!-- Inner rotating orbital -->
+              <circle cx="50" cy="50" r="30" stroke="#FFFFFF" stroke-width="1.5" fill="none" stroke-dasharray="40 150" stroke-linecap="round" class="spin-fast"/>
+              <!-- Center core -->
+              <circle cx="50" cy="50" r="8" fill="#00F0FF" class="pulse-glow" style="filter: drop-shadow(0 0 8px #00F0FF);"/>
+            </svg>
+        </div>
         <div id="splash-percent" style="
             color: #FFFFFF;
             font-family: 'Inter', monospace;
@@ -185,10 +204,19 @@ st.markdown("""
         color: #F3F4F6 !important;
     }
     
-    /* Header & Branding Elimination */
-    [data-testid="stHeader"], footer, #MainMenu {
+    /* Header & Branding Elimination (but preserving sidebar toggle) */
+    #MainMenu, footer {
         visibility: hidden !important;
         height: 0px !important;
+        display: none !important;
+    }
+    
+    [data-testid="stHeader"] {
+        background-color: transparent !important;
+    }
+    
+    [data-testid="stHeader"] .stAppDeployButton {
+        display: none !important;
     }
     
     /* Sleek Sidebar Architecture */
