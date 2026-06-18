@@ -461,7 +461,80 @@ with tab3:
             target_df = [{"Rank": r+1, "Feature ID": idx, "Dosage": f"{d:.4f}"} for r, (idx, d) in enumerate(top_targets)]
             st.table(pd.DataFrame(target_df))
             
+    # --- PHASE 11: KINETIC REINFORCEMENT LEARNING ---
+    st.markdown("---")
+    st.subheader("Dynamic Trajectory Control (RL Policy)")
+    st.write("Execute a time-series kinetic simulation using the Reinforcement Learning agent to dynamically optimize multi-organ safety against emerging drug resistance.")
+    
+    if st.button("Run Phase 11 Kinetic RL Simulation", use_container_width=True):
+        with st.spinner("Initializing Actor-Critic Policy Engine & Kinetic Microenvironment..."):
+            from core.rl_agent import RLEngine
+            from core.kinetics import MicroenvironmentEnv
+            
+            rl_engine = RLEngine(v_data.shape[1], lr_actor=1e-3, lr_critic=1e-3)
+            env = MicroenvironmentEnv(v_data[selected_cell], max_steps=20, mutation_std=0.02)
+            
+            state = env.reset()
+            
+            history = {
+                'Timestep': [],
+                'Free Energy': [],
+                'Cardiac Strain': [],
+                'Hepatic Burden': [],
+                'Mean Dosage': []
+            }
+            
+            progress_bar = st.progress(0)
+            
+            for step in range(1, 21):
+                # 1. RL Policy selects action
+                action = rl_engine.select_action(state, noise_std=0.05)
+                
+                # 2. Step the Kinetic Environment
+                next_state, done = env.step(action)
+                
+                # 3. Calculate Reward & Telemetry
+                reward, fe, tox, sys_risks = rl_engine.calculate_reward(active_rbm, sys_net, next_state, action, is_quantum)
+                
+                # 4. Train the RL Agent dynamically (Online Learning)
+                critic_loss, actor_loss = rl_engine.train_step(state, action, reward, next_state, done)
+                
+                # Log telemetry
+                history['Timestep'].append(step)
+                history['Free Energy'].append(fe)
+                history['Cardiac Strain'].append(sys_risks.get('Cardiac_Tissue', 0))
+                history['Hepatic Burden'].append(sys_risks.get('Hepatic_Tissue', 0))
+                history['Mean Dosage'].append(action.abs().mean().item())
+                
+                state = next_state
+                progress_bar.progress(step / 20.0)
+                
+            st.success("RL Adaptive Simulation Complete!")
+            
+            # Plot the Telemetry
+            df_history = pd.DataFrame(history)
+            
+            fig_rl = go.Figure()
+            fig_rl.add_trace(go.Scatter(x=df_history['Timestep'], y=df_history['Free Energy'], mode='lines+markers', name='Target Free Energy', line=dict(color='#00F0FF', width=3)))
+            fig_rl.add_trace(go.Scatter(x=df_history['Timestep'], y=df_history['Cardiac Strain'], mode='lines', name='Cardiac Strain', line=dict(color='#FF4B4B', dash='dot')))
+            fig_rl.add_trace(go.Scatter(x=df_history['Timestep'], y=df_history['Hepatic Burden'], mode='lines', name='Hepatic Burden', line=dict(color='#ffdd54', dash='dot')))
+            fig_rl.add_trace(go.Scatter(x=df_history['Timestep'], y=df_history['Mean Dosage'] * 100, mode='lines', name='Mean Dosage Intensity', line=dict(color='#9CA3AF', dash='dash')))
+            
+            fig_rl.update_layout(
+                title="Phase 11: RL Adaptive Treatment Trajectory",
+                xaxis_title="Simulation Timestep",
+                yaxis_title="Metric Value",
+                template="plotly_dark",
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font=dict(family="Inter, sans-serif", color="#9CA3AF"),
+                margin=dict(l=20, r=20, t=40, b=20),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+            )
+            st.plotly_chart(fig_rl, use_container_width=True)
+
     if 'optimal_targets' in st.session_state:
+        st.markdown("---")
         st.subheader("Autonomous Clinical Actions")
         
         action_col1, action_col2 = st.columns(2)
