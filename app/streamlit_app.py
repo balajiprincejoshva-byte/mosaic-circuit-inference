@@ -168,6 +168,101 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# --- PACMAN LOADING ANIMATION ---
+if 'app_loaded' not in st.session_state:
+    loader_placeholder = st.empty()
+    loader_placeholder.markdown("""
+        <style>
+        .loader-wrapper {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background-color: #030712;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 999999;
+        }
+        .loading-text {
+            color: #F3F4F6;
+            font-family: 'Inter', sans-serif;
+            font-size: 2.8rem;
+            font-weight: 700;
+            margin-bottom: 60px;
+            letter-spacing: 1px;
+        }
+        .pacman {
+          width: 0px;
+          height: 0px;
+          border-right: 60px solid transparent;
+          border-top: 60px solid #FF4560;
+          border-left: 60px solid #FF4560;
+          border-bottom: 60px solid #FF4560;
+          border-radius: 60px;
+          animation: chomp 0.4s infinite alternate linear;
+          position: relative;
+          z-index: 2;
+        }
+        .pacman::before {
+          content: '';
+          position: absolute;
+          top: -35px;
+          left: 10px;
+          width: 15px;
+          height: 15px;
+          background-color: #030712;
+          border-radius: 50%;
+        }
+        @keyframes chomp {
+          0% { border-right-color: transparent; }
+          100% { border-right-color: #FF4560; }
+        }
+        .dot-container {
+            position: absolute;
+            display: flex;
+            gap: 40px;
+            left: 80px;
+            z-index: 1;
+        }
+        .dot {
+            width: 25px;
+            height: 25px;
+            background-color: #E5E7EB;
+            border-radius: 50%;
+            animation: moveDots 0.4s infinite linear;
+        }
+        .dot:nth-child(3) { background-color: #9CA3AF; }
+        @keyframes moveDots {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-65px); }
+        }
+        .pacman-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        </style>
+        <div class="loader-wrapper">
+            <div class="loading-text">Now doing loading</div>
+            <div class="pacman-wrapper">
+                <div class="pacman"></div>
+                <div class="dot-container">
+                    <div class="dot"></div>
+                    <div class="dot"></div>
+                    <div class="dot"></div>
+                </div>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    # Pre-warm the cache while the animation plays
+    setup_mosaic_engine()
+    
+    # Hold the animation for a total of 2.5 seconds for effect
+    time.sleep(2.5)
+    loader_placeholder.empty()
+    st.session_state['app_loaded'] = True
+
 st.title("MOSAIC: Spatial Regulatory Dynamics")
 
 # Load Engine
