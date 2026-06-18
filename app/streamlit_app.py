@@ -7,8 +7,7 @@ import torch
 import sys
 import os
 import time
-
-# Ensure core is in path
+import contextlib# Ensure core is in path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from core.matrix_io import MultiOmicTensor
@@ -36,6 +35,131 @@ def native_pca(X: torch.Tensor, n_components: int = 2) -> torch.Tensor:
     components = V[:, :n_components]
     projected = torch.matmul(X_centered, components)
     return projected
+
+# --- CUSTOM CSS SPINNERS ---
+@contextlib.contextmanager
+def custom_spinner(text, loader_type="dots"):
+    placeholder = st.empty()
+    
+    base_css = """
+    <style>
+    .custom-loader-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 40px;
+        background: rgba(17, 24, 39, 0.4);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 12px;
+        margin: 20px 0;
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+    }
+    .loader-text {
+        color: #F3F4F6;
+        font-family: 'Inter', sans-serif;
+        margin-top: 25px;
+        font-weight: 600;
+        font-size: 1.1rem;
+        letter-spacing: 0.5px;
+    }
+    """
+    
+    loader_div = ""
+    if loader_type == "ring":
+        base_css += """
+        .loader-ring {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #374151;
+            border-bottom-color: #FF4560;
+            border-radius: 50%;
+            display: inline-block;
+            box-sizing: border-box;
+            animation: rotation 1s linear infinite;
+        }
+        @keyframes rotation {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        </style>
+        """
+        loader_div = '<div class="loader-ring"></div>'
+        
+    elif loader_type == "dots":
+        base_css += """
+        .loader-dots {
+            display: flex;
+            gap: 12px;
+        }
+        .loader-dots div {
+            width: 18px;
+            height: 18px;
+            background-color: #FF4560;
+            border-radius: 50%;
+            animation: pulse 0.8s infinite alternate;
+        }
+        .loader-dots div:nth-child(2) { animation-delay: -0.2s; background-color: #E5E7EB; }
+        .loader-dots div:nth-child(3) { animation-delay: -0.4s; background-color: #9CA3AF; }
+        @keyframes pulse {
+            0% { transform: scale(0.8); opacity: 0.3; }
+            100% { transform: scale(1.2); opacity: 1; }
+        }
+        </style>
+        """
+        loader_div = '<div class="loader-dots"><div></div><div></div><div></div></div>'
+        
+    elif loader_type == "bars":
+        base_css += """
+        .loader-bars {
+            display: flex;
+            gap: 6px;
+            height: 40px;
+            align-items: center;
+        }
+        .loader-bars div {
+            width: 8px;
+            height: 15px;
+            background-color: #FF4560;
+            animation: bounceBars 0.5s infinite alternate;
+            border-radius: 2px;
+        }
+        .loader-bars div:nth-child(2) { animation-delay: 0.1s; }
+        .loader-bars div:nth-child(3) { animation-delay: 0.2s; }
+        .loader-bars div:nth-child(4) { animation-delay: 0.3s; }
+        .loader-bars div:nth-child(5) { animation-delay: 0.4s; }
+        @keyframes bounceBars {
+            0% { height: 15px; opacity: 0.5; }
+            100% { height: 40px; opacity: 1; }
+        }
+        </style>
+        """
+        loader_div = '<div class="loader-bars"><div></div><div></div><div></div><div></div><div></div></div>'
+        
+    elif loader_type == "square":
+        base_css += """
+        .loader-square {
+            width: 40px;
+            height: 40px;
+            background-color: #FF4560;
+            animation: flip 1.2s infinite ease-in-out;
+        }
+        @keyframes flip {
+            0% { transform: perspective(120px) rotateX(0deg) rotateY(0deg); }
+            50% { transform: perspective(120px) rotateX(-180.1deg) rotateY(0deg); }
+            100% { transform: perspective(120px) rotateX(-180deg) rotateY(-179.9deg); }
+        }
+        </style>
+        """
+        loader_div = '<div class="loader-square"></div>'
+        
+    html = f"{base_css}<div class='custom-loader-container'>{loader_div}<div class='loader-text'>{text}</div></div>"
+    placeholder.markdown(html, unsafe_allow_html=True)
+    
+    try:
+        yield
+    finally:
+        placeholder.empty()
 
 # --- SETUP MOCK DATA ---
 @st.cache_resource
@@ -312,7 +436,7 @@ with tab1:
         st.write("Fire an intervention and observe the cascading state-shift across the tissue due to spatial coupling.")
         if st.button("Fire Spatial Intervention", use_container_width=True):
             tf_global_idx = 30 + 20 + target_tf
-            with st.spinner("Simulating Coupled Spatial Langevin Dynamics..."):
+            with custom_spinner("Simulating Coupled Spatial Langevin Dynamics...", "ring"):
                 # Simulate the whole tissue reacting simultaneously
                 # Force the target_gene of ONLY the selected cell to be 1.0 (Overexpression)
                 # We can do this by manually intercepting the trajectory, but for simplicity,
@@ -417,7 +541,7 @@ with tab3:
     target_cell = st.slider("Select Target Attractor State", 0, v_data.shape[0]-1, min(100, v_data.shape[0]-1))
     
     if st.button("Auto-Discover Targets"):
-        with st.spinner("Executing Quantum Tensor Contractions..."):
+        with custom_spinner("Executing Quantum Tensor Contractions...", "dots"):
             optimizer = TargetOptimizer(rbm, v_data[target_cell], avoidance_states)
             optimal_delta_v, top_targets = optimizer.optimize(steps=150)
             
@@ -445,7 +569,7 @@ with tab3:
         
         with action_col1:
             if st.button("Generate Pre-Clinical FDA Dossier", use_container_width=True):
-                with st.spinner("Orchestrating AI Pharmacologist via OpenRouter..."):
+                with custom_spinner("Orchestrating AI Pharmacologist via OpenRouter...", "bars"):
                     try:
                         # Gather metrics
                         tfs = [t[0] for t in st.session_state['optimal_targets']]
@@ -481,7 +605,7 @@ with tab3:
 
         with action_col2:
             if st.button("Verify 3D Protein Structure", use_container_width=True):
-                with st.spinner("Resolving Atomic Conformation from DeepMind AlphaFold DB..."):
+                with custom_spinner("Resolving Atomic Conformation from DeepMind AlphaFold DB...", "square"):
                     try:
                         # Map TF index to a realistic gene from our bridge
                         top_tf_idx = st.session_state['optimal_targets'][0][0]
@@ -544,7 +668,7 @@ with tab3:
         st.write("Translate the digital therapeutic vector into a physical liquid-handling robotic protocol.")
         
         if st.button("🚀 Deploy to Physical Wet-Lab (OT-2)", type="primary", use_container_width=True):
-            with st.spinner("Compiling Opentrons Protocol..."):
+            with custom_spinner("Compiling Opentrons Protocol...", "dots"):
                 target_tfs = [t[0] for t in st.session_state['optimal_targets']]
                 dosages = [t[1] for t in st.session_state['optimal_targets']]
                 
